@@ -60,6 +60,19 @@ def _normalize_hypotheses(raw: Any) -> List[Dict[str, Any]]:
                     }
                 )
     return output
+import re
+
+def remove_triage_section(txt: str) -> str:
+    if not txt:
+        return txt
+
+    pattern = r"===== *TRIAGE *=====.*?(?======|$)"
+    cleaned = re.sub(pattern, "", txt, flags=re.IGNORECASE | re.DOTALL)
+
+    # Remove stray blank lines created by removal
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+    return cleaned
 
 
 def _normalize_citations(raw: Any) -> List[str]:
@@ -98,14 +111,15 @@ def _coerce_to_schema(raw: Dict[str, Any]) -> Dict[str, Any]:
     data["diagnosis_hypotheses"] = _normalize_hypotheses(data["diagnosis_hypotheses"])
     return data
 
-
+AI_disabled = False
 def reason(text: str) -> UrgencyOutput:
     """
     Send raw text about the patient to Gemini and return structured UrgencyOutput.
     The `text` should contain all info: symptoms, history, vitals, timeline, etc.
     """
     api_key = getattr(settings, "GEMINI_API_KEY", None)
-    if api_key is None or "fake" in str(api_key).lower():
+    text = remove_triage_section(text)
+    if api_key is None or "fake" in str(api_key).lower() or AI_disabled:
         # Return deterministic mock output for CI
         return UrgencyOutput(
             urgency_flag="uncertain",
